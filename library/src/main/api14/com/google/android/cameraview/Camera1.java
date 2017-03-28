@@ -269,6 +269,12 @@ class Camera1 extends CameraViewImpl {
                 return;
             }
         }
+        // There was no front camera
+        if(Camera.getNumberOfCameras() > 0){
+            mCameraId = 0;
+            mFacing = Camera.CameraInfo.CAMERA_FACING_FRONT;
+            return;
+        }
         mCameraId = INVALID_CAMERA_ID;
     }
 
@@ -293,7 +299,7 @@ class Camera1 extends CameraViewImpl {
             mAspectRatio = Constants.DEFAULT_ASPECT_RATIO;
         }
         adjustCameraParameters();
-        mCamera.setDisplayOrientation(calcCameraRotation(mDisplayOrientation));
+        mCamera.setDisplayOrientation(calcDisplayRotation(mDisplayOrientation));
         mCallback.onCameraOpened();
     }
 
@@ -326,7 +332,8 @@ class Camera1 extends CameraViewImpl {
             mCameraParameters.setPictureSize(pictureSize.getWidth(), pictureSize.getHeight());
             mCameraParameters.setRotation(calcCameraRotation(mDisplayOrientation));
             setAutoFocusInternal(mAutoFocus);
-            setFlashInternal(mFlash);
+            if(mFacing == Camera.CameraInfo.CAMERA_FACING_BACK)
+                setFlashInternal(mFlash);
             mCamera.setParameters(mCameraParameters);
             if (mShowingPreview) {
                 mCamera.startPreview();
@@ -370,6 +377,10 @@ class Camera1 extends CameraViewImpl {
     }
 
     private int calcCameraRotation(int rotation) {
+        return ((mCameraInfo.orientation + rotation) % 360) % 360;
+    }
+
+    private int calcDisplayRotation(int rotation) {
         if (mCameraInfo.facing == Camera.CameraInfo.CAMERA_FACING_FRONT) {
             return (360 - (mCameraInfo.orientation + rotation) % 360) % 360;
         } else {  // back-facing
