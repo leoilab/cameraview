@@ -35,6 +35,7 @@ import java.util.SortedSet;
 class Camera1 extends CameraViewImpl {
 
     private static final int INVALID_CAMERA_ID = -1;
+    public static final int MAX_METERING_WEIGHT = 1000;
 
     private static final SparseArrayCompat<String> FLASH_MODES = new SparseArrayCompat<>();
 
@@ -194,12 +195,14 @@ class Camera1 extends CameraViewImpl {
             return mAutoFocus;
         }
         String focusMode = mCameraParameters.getFocusMode();
-        return focusMode != null && focusMode.contains("continuous") || focusMode.contains("auto");
+        return focusMode != null && focusMode.contains(
+                Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE) ||
+                focusMode.contains(Camera.Parameters.FOCUS_MODE_AUTO);
     }
 
     @Override
     public void setMeteringRect(Rect afRegion) {
-        Camera.Area area = new Camera.Area(afRegion, 1000);
+        Camera.Area area = new Camera.Area(afRegion, MAX_METERING_WEIGHT);
 
         if(area.equals(mMeteringRect)){
             return;
@@ -259,7 +262,8 @@ class Camera1 extends CameraViewImpl {
             }, 200);
             return;
         }
-        mCamera.autoFocus(null);       // do the focus, callback is mAutoFocusCallback
+        takePictureInternal(); // Take picture without auto-focus
+
     }
 
     void takePictureInternal() {
@@ -438,9 +442,9 @@ class Camera1 extends CameraViewImpl {
         }
     }
     private boolean setMeteringRectInternal(Camera.Area area){
-        if(area == null)
+        if(area == null) {
             return false;
-
+        }
         mMeteringRect = area;
 
         if (isCameraOpened()) {

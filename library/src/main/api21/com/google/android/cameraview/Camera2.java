@@ -347,7 +347,12 @@ class Camera2 extends CameraViewImpl {
 
     @Override
     public void setMeteringRect(@NonNull Rect rect) {
-        rect = normalizeMeteringArea(rect);
+        // normalise rect dimensions from [-1000, 1000] into [0,1000]
+        rect = new Rect((rect.left + 1000) / 2,
+                (rect.top + 1000) / 2,
+                (rect.right + 1000) / 2,
+                (rect.bottom + 1000) / 2);
+
         if(rect.equals(mMeteringRect)) {
             return;
         }
@@ -454,16 +459,6 @@ class Camera2 extends CameraViewImpl {
         mSensor.left = 0;
         mSensor.bottom -= mSensor.top;
         mSensor.top = 0;
-    }
-    private Rect normalizeMeteringArea (Rect rect){
-
-        // noramalize rect into [0,1]
-        Rect norm = new Rect((rect.left + 1000) / 2,
-                (rect.top + 1000) / 2,
-                (rect.right + 1000) / 2,
-                (rect.bottom + 1000) / 2);
-
-        return norm;
     }
 
     protected void collectPictureSizes(SizeMap sizes, StreamConfigurationMap map) {
@@ -661,9 +656,10 @@ class Camera2 extends CameraViewImpl {
             CaptureRequest.Builder captureRequestBuilder = mCamera.createCaptureRequest(
                     CameraDevice.TEMPLATE_STILL_CAPTURE);
             captureRequestBuilder.addTarget(mImageReader.getSurface());
-            if(getAutoFocus())
+            if(getAutoFocus()){
                 captureRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE,
                     CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
+            }
             switch (mFlash) {
                 case Constants.FLASH_OFF:
                     captureRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE,
