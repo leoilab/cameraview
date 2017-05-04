@@ -17,12 +17,13 @@
 package com.google.android.cameraview;
 
 import android.annotation.SuppressLint;
+import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.SurfaceTexture;
 import android.hardware.Camera;
 import android.os.Build;
-import android.os.Handler;
 import android.support.v4.util.SparseArrayCompat;
+import android.util.Log;
 import android.view.SurfaceHolder;
 
 import java.io.IOException;
@@ -71,7 +72,9 @@ class Camera1 extends CameraViewImpl {
 
     private int mDisplayOrientation;
 
-    private Camera.Area mMeteringRect;
+    private Point mAutoFocusPoint;
+
+    private Point mAutoExposurePoint;
 
     Camera1(Callback callback, PreviewImpl preview) {
         super(callback, preview);
@@ -95,6 +98,7 @@ class Camera1 extends CameraViewImpl {
         }
         mShowingPreview = true;
         mCamera.startPreview();
+        Log.d("Camera1", "Camera started!");
         return true;
     }
 
@@ -199,22 +203,32 @@ class Camera1 extends CameraViewImpl {
                 Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE) ||
                 focusMode.contains(Camera.Parameters.FOCUS_MODE_AUTO);
     }
-
     @Override
-    public void setMeteringRect(Rect afRegion) {
-        Camera.Area area = new Camera.Area(afRegion, MAX_METERING_WEIGHT);
-
-        if(area.equals(mMeteringRect)){
+    void setAutoExposurePoint(Point autoExposurePoint){
+        if(autoExposurePoint.equals(mAutoExposurePoint)){
             return;
         }
-        if(setMeteringRectInternal(area)){
+        if(setAutoExposurePointInternal(autoExposurePoint)){
             mCamera.setParameters(mCameraParameters);
         }
     }
+    @Override
+    void setAutoFocusPoint(Point autoFocusPoint){
+        if(autoFocusPoint.equals(mAutoFocusPoint)){
+            return;
+        }
+        if(setAutoFocusPointInternal(autoFocusPoint)){
+            mCamera.setParameters(mCameraParameters);
+        }
+    }
+    @Override
+    Point getAutoExposurePoint() {
+        return mAutoExposurePoint;
+    }
 
     @Override
-    public Rect getMeteringRect() {
-        return mMeteringRect.rect;
+    Point getAutoFocusPoint() {
+        return mAutoFocusPoint;
     }
 
     @Override
@@ -239,31 +253,18 @@ class Camera1 extends CameraViewImpl {
                     "Camera is not ready. Call start() before takePicture().");
         }
         if (getAutoFocus()) {
-            mCamera.cancelAutoFocus();      // cancels continuous focus
-            // determine current focus mode
-            Camera.Parameters params = mCamera.getParameters();
-            List<String> lModes = params.getSupportedFocusModes();
-            if (lModes != null) {
-                if (lModes.contains(Camera.Parameters.FOCUS_MODE_AUTO)) {
-                    params.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO); // auto-focus mode if supported
-                    mCamera.setParameters(params);        // set parameters on device
+            mCamera.cancelAutoFocus();
+            mCameraParameters.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO);
+            mCamera.setParameters(mCameraParameters);
+            mCamera.autoFocus(new Camera.AutoFocusCallback() {
+                @Override
+                public void onAutoFocus(boolean success, Camera camera) {
+                    takePictureInternal();
                 }
-            }
-            // start an auto-focus after a slight (200ms) delay
-            new Handler().postDelayed(new Runnable() {
-                public void run() {
-                    mCamera.autoFocus(new Camera.AutoFocusCallback() {
-                        @Override
-                        public void onAutoFocus(boolean success, Camera camera) {
-                            takePictureInternal();
-                        }
-                    });    // auto-focus now
-                }
-            }, 200);
-            return;
+            });
+        } else {
+            takePictureInternal();
         }
-        takePictureInternal(); // Take picture without auto-focus
-
     }
 
     void takePictureInternal() {
@@ -273,7 +274,8 @@ class Camera1 extends CameraViewImpl {
                 mCallback.onPictureTaken(data);
                 camera.cancelAutoFocus();
                 setAutoFocusInternal(mAutoFocus);
-                setMeteringRectInternal(mMeteringRect);
+                setAutoExposurePointInternal(mAutoExposurePoint);
+                setAutoFocusPointInternal(mAutoFocusPoint);
                 camera.startPreview();
             }
         });
@@ -374,7 +376,8 @@ class Camera1 extends CameraViewImpl {
             mCameraParameters.setPictureSize(pictureSize.getWidth(), pictureSize.getHeight());
             mCameraParameters.setRotation(calcCameraRotation(mDisplayOrientation));
             setAutoFocusInternal(mAutoFocus);
-            setMeteringRectInternal(mMeteringRect);
+            setAutoFocusPointInternal(mAutoFocusPoint);
+            setAutoExposurePointInternal(mAutoExposurePoint);
             if(mFacing == Camera.CameraInfo.CAMERA_FACING_BACK)
                 setFlashInternal(mFlash);
             mCamera.setParameters(mCameraParameters);
@@ -452,24 +455,57 @@ class Camera1 extends CameraViewImpl {
             return false;
         }
     }
-    private boolean setMeteringRectInternal(Camera.Area area){
-        if(area == null) {
+    private boolean setAutoFocusPointInternal(Point autoFocusPoint){
+        if(autoFocusPoint == null) {
             return false;
         }
-        mMeteringRect = area;
+        mAutoFocusPoint = autoFocusPoint;
+
+        // TODO: come up with some better heuristics regarding area size;
+        final int areaSize  = 200;
+
+        Rect autoFocusArea = new Rect(Math.max(mAutoFocusPoint.x - areaSize / 2,  -1000),
+                Math.max(mAutoFocusPoint.y - areaSize / 2, -1000),
+                Math.min(mAutoFocusPoint.x + areaSize / 2, 1000),
+                Math.min(mAutoFocusPoint.y + areaSize / 2, 1000));
+
+        Camera.Area area = new Camera.Area(autoFocusArea, MAX_METERING_WEIGHT);
 
         if (isCameraOpened()) {
             if (mAutoFocus && mCameraParameters.getMaxNumFocusAreas() > 0){
-                mCamera.cancelAutoFocus();
-                mCameraParameters.setFocusMode(Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE);
-                mCameraParameters.setFocusAreas(Arrays.asList(mMeteringRect));
+                mCameraParameters.setFocusAreas(Arrays.asList(area));
                 return true;
             }
-            return true;
+            Log.d("Camera1", "Setting AF regions is NOT supported");
         }
-        else {
+        return false;
+
+    }
+
+    private boolean setAutoExposurePointInternal(Point autoExposurePoint){
+        if(autoExposurePoint == null) {
             return false;
         }
+        mAutoExposurePoint = autoExposurePoint;
+
+        // TODO: come up with some better heuristics regarding area size, right now when centered, half of the active view is used
+        final int areaSize  = 1000;
+
+        Rect autoFocusArea = new Rect(Math.max(mAutoExposurePoint.x - areaSize / 2,  -1000),
+                Math.max(mAutoExposurePoint.y - areaSize / 2, -1000),
+                Math.min(mAutoExposurePoint.x + areaSize / 2, 1000),
+                Math.min(mAutoExposurePoint.y + areaSize / 2, 1000));
+
+        Camera.Area area = new Camera.Area(autoFocusArea, MAX_METERING_WEIGHT);
+
+        if (isCameraOpened()){
+            if(mCameraParameters.getMaxNumMeteringAreas() > 0) {
+                mCameraParameters.setMeteringAreas(Arrays.asList(area));
+                return true;
+            }
+            Log.d("Camera1", "Setting AE regions is NOT supported");
+        }
+        return false;
     }
 
     /**

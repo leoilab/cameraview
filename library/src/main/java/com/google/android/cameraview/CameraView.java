@@ -19,7 +19,7 @@ package com.google.android.cameraview;
 import android.app.Activity;
 import android.content.Context;
 import android.content.res.TypedArray;
-import android.graphics.Rect;
+import android.graphics.Point;
 import android.os.Build;
 import android.os.Parcel;
 import android.os.Parcelable;
@@ -29,6 +29,8 @@ import android.support.annotation.Nullable;
 import android.support.v4.os.ParcelableCompat;
 import android.support.v4.os.ParcelableCompatCreatorCallbacks;
 import android.util.AttributeSet;
+import android.util.Log;
+import android.view.View;
 import android.widget.FrameLayout;
 
 import java.lang.annotation.Retention;
@@ -99,6 +101,7 @@ public class CameraView extends FrameLayout {
         } else {
             mImpl = new Camera2Api23(mCallbacks, preview, context);
         }
+
         // Attributes
         TypedArray a = context.obtainStyledAttributes(attrs, R.styleable.CameraView, defStyleAttr,
                 R.style.Widget_CameraView);
@@ -208,6 +211,8 @@ public class CameraView extends FrameLayout {
         state.ratio = getAspectRatio();
         state.autoFocus = getAutoFocus();
         state.flash = getFlash();
+        state.focusPoint = getFocusArea();
+        state.exposurePoint = getAutoExposureArea();
         return state;
     }
 
@@ -223,6 +228,10 @@ public class CameraView extends FrameLayout {
         setAspectRatio(ss.ratio);
         setAutoFocus(ss.autoFocus);
         setFlash(ss.flash);
+        if(ss.focusPoint != null)
+            setFocusArea(ss.focusPoint);
+        if(ss.exposurePoint != null)
+            setAutoExposureArea(ss.exposurePoint);
     }
 
     /**
@@ -387,25 +396,50 @@ public class CameraView extends FrameLayout {
     }
 
     /**
-     * Sets the metering area used for AF and AE.
+     * Sets the center coordinate of the region used for auto-exposure
      *
-     * The metering area is a rectangle with specified weight.
-     * The direction is relative to the sensor orientation, that is, what the sensor sees.
+     * The region is a 300 pixel rectangle with the center being the provided coordinate.
+     * The position is relative to the actual active region of the sensor.
      * The direction is not affected by the rotation or mirroring of setDisplayOrientation(int).
-     * Coordinates of the rectangle range from -1000 to 1000. (-1000, -1000) is the upper left
-     * point, (1000, 1000) is the lower right point.
-     * The width and height of metering areas cannot be 0 or negative.
+     * Coordinates are specified wihtin [-1000, 1000] where (-1000,-1000) is the upper left
+     * point and (1000, 1000) is the lower right point.
      *
-     * @param rect AF and AE rectangular metering area.
+     * @param focusPoint center of the rectangle used for AF within [-1000, 1000]
      */
-
-    public void setMeteringRect(Rect rect) {
-        mImpl.setMeteringRect(rect);
+    public void setFocusArea(Point focusPoint) {
+        mImpl.setAutoFocusPoint(focusPoint);
     }
 
-    public Rect getMeteringRect() {
-        return mImpl.getMeteringRect();
+    /**
+     * Gets the center point for current auto focus area
+     *
+     * @return the center point of AF area
+     */
+        public Point getFocusArea() {
+        return mImpl.getAutoFocusPoint();
     }
+
+    /**
+     * Sets the center coordinate of the area used for auto-exposure
+     *
+     * The region is a 300 pixel rectangle with the center being the provided coordinate.
+     * The position is relative to the actual active region of the sensor.
+     * The direction is not affected by the rotation or mirroring of setDisplayOrientation(int).
+     * Coordinates are specified wihtin [-1000, 1000] where (-1000,-1000) is the upper left
+     * point and (1000, 1000) is the lower right point.
+     *
+     * @param exposurePoint center of the area used for AE within [-1000, 1000]
+     */
+    public void setAutoExposureArea(Point exposurePoint){
+        mImpl.setAutoExposurePoint(exposurePoint);
+    }
+
+    /**
+     * Gets the center point for current auto exposure rectangle
+     *
+     * @return the center point of AE area
+     */
+    public Point getAutoExposureArea(){ return mImpl.getAutoExposurePoint(); }
 
     /**
      * Take a picture. The result will be returned to
@@ -469,6 +503,10 @@ public class CameraView extends FrameLayout {
 
         AspectRatio ratio;
 
+        Point focusPoint;
+
+        Point exposurePoint;
+
         boolean autoFocus;
 
         @Flash
@@ -481,6 +519,8 @@ public class CameraView extends FrameLayout {
             ratio = source.readParcelable(loader);
             autoFocus = source.readByte() != 0;
             flash = source.readInt();
+            focusPoint = source.readParcelable(loader);
+            exposurePoint = source.readParcelable(loader);
         }
 
         public SavedState(Parcelable superState) {
@@ -494,6 +534,8 @@ public class CameraView extends FrameLayout {
             out.writeParcelable(ratio, 0);
             out.writeByte((byte) (autoFocus ? 1 : 0));
             out.writeInt(flash);
+            out.writeParcelable(focusPoint, 0);
+            out.writeParcelable(exposurePoint, 0);
         }
 
         public static final Parcelable.Creator<SavedState> CREATOR
