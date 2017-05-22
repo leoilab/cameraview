@@ -19,14 +19,18 @@ package com.google.android.cameraview;
 import android.annotation.TargetApi;
 import android.content.Context;
 import android.graphics.ImageFormat;
+import android.graphics.Point;
+import android.graphics.Rect;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
+import android.hardware.camera2.CameraMetadata;
 import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.CaptureResult;
 import android.hardware.camera2.TotalCaptureResult;
+import android.hardware.camera2.params.MeteringRectangle;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.Image;
 import android.media.ImageReader;
@@ -92,6 +96,8 @@ class Camera2 extends CameraViewImpl {
             }
             mCaptureSession = session;
             updateAutoFocus();
+            updateAutoExposureArea();
+            updateAutoFocusArea();
             updateFlash();
             try {
                 mCaptureSession.setRepeatingRequest(mPreviewRequestBuilder.build(),
@@ -184,6 +190,12 @@ class Camera2 extends CameraViewImpl {
     private int mFlash;
 
     private int mDisplayOrientation;
+
+    private Rect mSensor;
+
+    private Point mAutoFocusPoint;
+
+    private Point mAutoExposurePoint;
 
     Camera2(Callback callback, PreviewImpl preview, Context context) {
         super(callback, preview);
@@ -335,6 +347,54 @@ class Camera2 extends CameraViewImpl {
         mPreview.setDisplayOrientation(mDisplayOrientation);
     }
 
+    @Override
+    void setAutoFocusPoint(Point point) {
+        if (mAutoFocusPoint == point) {
+            return;
+        }
+        mAutoFocusPoint = point;
+        if (mPreviewRequestBuilder != null) {
+            updateAutoFocusArea();
+            if (mCaptureSession != null) {
+                try {
+                    mCaptureSession.setRepeatingRequest(mPreviewRequestBuilder.build(),
+                            mCaptureCallback, null);
+                } catch (CameraAccessException e) {
+                    mAutoFocus = !mAutoFocus; // Revert
+                }
+            }
+        }
+    }
+
+    @Override
+    void setAutoExposurePoint(Point point) {
+        if (mAutoExposurePoint == point) {
+            return;
+        }
+        mAutoExposurePoint = point;
+        if (mPreviewRequestBuilder != null) {
+            updateAutoExposureArea();
+            if (mCaptureSession != null) {
+                try {
+                    mCaptureSession.setRepeatingRequest(mPreviewRequestBuilder.build(),
+                            mCaptureCallback, null);
+                } catch (CameraAccessException e) {
+                    mAutoFocus = !mAutoFocus; // Revert
+                }
+            }
+        }
+    }
+
+    @Override
+    Point getAutoFocusPoint() {
+        return mAutoFocusPoint;
+    }
+
+    @Override
+    Point getAutoExposurePoint() {
+        return mAutoFocusPoint;
+    }
+
     /**
      * <p>Chooses a camera ID by the specified camera facing ({@link #mFacing}).</p>
      * <p>This rewrites {@link #mCameraId}, {@link #mCameraCharacteristics}, and optionally
@@ -414,6 +474,8 @@ class Camera2 extends CameraViewImpl {
         if (!mPreviewSizes.ratios().contains(mAspectRatio)) {
             mAspectRatio = mPreviewSizes.ratios().iterator().next();
         }
+        mSensor = mCameraCharacteristics.get
+                (CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE);
     }
 
     protected void collectPictureSizes(SizeMap sizes, StreamConfigurationMap map) {
@@ -433,6 +495,7 @@ class Camera2 extends CameraViewImpl {
      * <p>Starts opening a camera device.</p>
      * <p>The result will be processed in {@link #mCameraDeviceCallback}.</p>
      */
+    @SuppressWarnings("MissingPermission")
     private void startOpeningCamera() {
         try {
             mCameraManager.openCamera(mCameraId, mCameraDeviceCallback, null);
@@ -513,6 +576,52 @@ class Camera2 extends CameraViewImpl {
         }
     }
 
+    private void updateAutoExposureArea() {
+        if (mAutoExposurePoint == null ||
+                mCameraCharacteristics.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AE) <= 0) {
+            return;
+        }
+
+        // normalise rect dimensions from [-1000, 1000] into [0,1]
+        int x = (int)((float)(mAutoExposurePoint.x + 1000) / 2000) * mSensor.width();
+        int y = (int)((float)(mAutoExposurePoint.y + 1000) / 2000) * mSensor.height();
+
+        // TODO: Find a better way to set the size of the metering area
+        final int areaDimension  = 300;
+
+        MeteringRectangle area = new MeteringRectangle(Math.max(x - areaDimension / 2,  0),
+                Math.max(y - areaDimension / 2, 0),
+                areaDimension,
+                areaDimension,
+                MeteringRectangle.METERING_WEIGHT_MAX);
+
+        mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AE_REGIONS,
+                new MeteringRectangle[]{area});
+    }
+
+    private void updateAutoFocusArea(){
+
+        if(mAutoFocusPoint == null || mCameraCharacteristics.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AF) <= 0) {
+            return;
+        }
+        // normalise rect dimensions from [-1000, 1000] into [0,1]
+        int x = (int)((float)(mAutoFocusPoint.x + 1000) / 2000) * mSensor.width();
+        int y = (int)((float)(mAutoFocusPoint.y + 1000) / 2000) * mSensor.height();
+
+        // TODO: Find a better way to set the size of the metering area
+        final int areaDimension  = 300;
+
+
+        MeteringRectangle area = new MeteringRectangle(Math.max(x - areaDimension / 2,  0),
+                Math.max(y - areaDimension / 2, 0),
+                areaDimension,
+                areaDimension,
+                MeteringRectangle.METERING_WEIGHT_MAX);
+
+        mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_REGIONS,
+                new MeteringRectangle[]{area});
+    }
+
     /**
      * Updates the internal state of flash to {@link #mFlash}.
      */
@@ -554,10 +663,23 @@ class Camera2 extends CameraViewImpl {
     /**
      * Locks the focus as the first step for a still image capture.
      */
-    private void lockFocus() {
-        mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER,
-                CaptureRequest.CONTROL_AF_TRIGGER_START);
+    private void lockFocus(){
         try {
+            if(mAutoFocusPoint != null){
+                mCaptureSession.stopRepeating();
+
+                mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER, CameraMetadata.CONTROL_AF_TRIGGER_CANCEL);
+                mCaptureSession.capture(mPreviewRequestBuilder.build(), mCaptureCallback, null);
+
+                mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER, CameraMetadata.CONTROL_AF_TRIGGER_IDLE);
+                mPreviewRequestBuilder.set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO);
+                mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_AUTO);
+                mCaptureSession.capture(mPreviewRequestBuilder.build(), mCaptureCallback, null);
+
+                mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER, CameraMetadata.CONTROL_AF_TRIGGER_START);
+                mCaptureCallback.setState(PictureCaptureCallback.STATE_LOCKING);
+                mCaptureSession.setRepeatingRequest(mPreviewRequestBuilder.build(), mCaptureCallback, null);
+            }
             mCaptureCallback.setState(PictureCaptureCallback.STATE_LOCKING);
             mCaptureSession.capture(mPreviewRequestBuilder.build(), mCaptureCallback, null);
         } catch (CameraAccessException e) {

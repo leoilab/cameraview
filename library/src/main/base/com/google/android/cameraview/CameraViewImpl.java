@@ -16,6 +16,7 @@
 
 package com.google.android.cameraview;
 
+import android.graphics.Point;
 import android.view.View;
 
 import java.util.Set;
@@ -68,6 +69,14 @@ abstract class CameraViewImpl {
     abstract void takePicture();
 
     abstract void setDisplayOrientation(int displayOrientation);
+
+    abstract void setAutoFocusPoint(Point point);
+
+    abstract Point getAutoFocusPoint();
+
+    abstract void setAutoExposurePoint(Point point);
+
+    abstract Point getAutoExposurePoint();
 
     interface Callback {
 
