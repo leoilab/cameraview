@@ -665,7 +665,7 @@ class Camera2 extends CameraViewImpl {
      */
     private void lockFocus(){
         try {
-            if(mAutoFocusPoint != null){
+            if (mAutoFocusPoint != null) {
                 mCaptureSession.stopRepeating();
 
                 mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER, CameraMetadata.CONTROL_AF_TRIGGER_CANCEL);
@@ -679,6 +679,8 @@ class Camera2 extends CameraViewImpl {
                 mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER, CameraMetadata.CONTROL_AF_TRIGGER_START);
                 mCaptureCallback.setState(PictureCaptureCallback.STATE_LOCKING);
                 mCaptureSession.setRepeatingRequest(mPreviewRequestBuilder.build(), mCaptureCallback, null);
+            } else {
+                mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER, CameraMetadata.CONTROL_AF_TRIGGER_START);
             }
             mCaptureCallback.setState(PictureCaptureCallback.STATE_LOCKING);
             mCaptureSession.capture(mPreviewRequestBuilder.build(), mCaptureCallback, null);
