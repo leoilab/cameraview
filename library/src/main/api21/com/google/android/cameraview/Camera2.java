@@ -140,6 +140,19 @@ class Camera2 extends CameraViewImpl {
         }
 
         @Override
+        protected void onFocusRequested() {
+            try {
+                mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER, CameraMetadata.CONTROL_AF_TRIGGER_START);
+                mCaptureSession.capture(mPreviewRequestBuilder.build(), mCaptureCallback, null);
+                mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER, CameraMetadata.CONTROL_AF_TRIGGER_IDLE);
+                mCaptureSession.setRepeatingRequest(mPreviewRequestBuilder.build(), mCaptureCallback, null);
+                setState(STATE_FOCUSING);
+            } catch (CameraAccessException e) {
+                e.printStackTrace();
+            }
+        }
+
+        @Override
         public void onReady() {
             captureStillPicture();
         }
@@ -360,7 +373,7 @@ class Camera2 extends CameraViewImpl {
                     mCaptureSession.setRepeatingRequest(mPreviewRequestBuilder.build(),
                             mCaptureCallback, null);
                 } catch (CameraAccessException e) {
-                    mAutoFocus = !mAutoFocus; // Revert
+                    mAutoFocusPoint = null; // Revert
                 }
             }
         }
@@ -379,7 +392,7 @@ class Camera2 extends CameraViewImpl {
                     mCaptureSession.setRepeatingRequest(mPreviewRequestBuilder.build(),
                             mCaptureCallback, null);
                 } catch (CameraAccessException e) {
-                    mAutoFocus = !mAutoFocus; // Revert
+                    mAutoExposurePoint = null; // Revert
                 }
             }
         }
@@ -587,7 +600,7 @@ class Camera2 extends CameraViewImpl {
         int y = (int)((float)(mAutoExposurePoint.y + 1000) / 2000) * mSensor.height();
 
         // TODO: Find a better way to set the size of the metering area
-        final int areaDimension  = 300;
+        final int areaDimension  = 200;
 
         MeteringRectangle area = new MeteringRectangle(Math.max(x - areaDimension / 2,  0),
                 Math.max(y - areaDimension / 2, 0),
@@ -609,7 +622,7 @@ class Camera2 extends CameraViewImpl {
         int y = (int)((float)(mAutoFocusPoint.y + 1000) / 2000) * mSensor.height();
 
         // TODO: Find a better way to set the size of the metering area
-        final int areaDimension  = 300;
+        final int areaDimension  = 200;
 
 
         MeteringRectangle area = new MeteringRectangle(Math.max(x - areaDimension / 2,  0),
@@ -665,25 +678,12 @@ class Camera2 extends CameraViewImpl {
      */
     private void lockFocus(){
         try {
-            if (mAutoFocusPoint != null) {
-                mCaptureSession.stopRepeating();
-
-                mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER, CameraMetadata.CONTROL_AF_TRIGGER_CANCEL);
-                mCaptureSession.capture(mPreviewRequestBuilder.build(), mCaptureCallback, null);
-
-                mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER, CameraMetadata.CONTROL_AF_TRIGGER_IDLE);
-                mPreviewRequestBuilder.set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO);
-                mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_AUTO);
-                mCaptureSession.capture(mPreviewRequestBuilder.build(), mCaptureCallback, null);
-
-                mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER, CameraMetadata.CONTROL_AF_TRIGGER_START);
-                mCaptureCallback.setState(PictureCaptureCallback.STATE_LOCKING);
-                mCaptureSession.setRepeatingRequest(mPreviewRequestBuilder.build(), mCaptureCallback, null);
-            } else {
-                mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER, CameraMetadata.CONTROL_AF_TRIGGER_START);
-            }
-            mCaptureCallback.setState(PictureCaptureCallback.STATE_LOCKING);
-            mCaptureSession.capture(mPreviewRequestBuilder.build(), mCaptureCallback, null);
+            mCaptureSession.stopRepeating();
+            mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER, CameraMetadata.CONTROL_AF_TRIGGER_CANCEL);
+            mCaptureCallback.setState(PictureCaptureCallback.STATE_FOCUS_REQUEST);
+            mPreviewRequestBuilder.set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO);
+            mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_MACRO);
+            mCaptureSession.setRepeatingRequest(mPreviewRequestBuilder.build(), mCaptureCallback, null );
         } catch (CameraAccessException e) {
             Log.e(TAG, "Failed to lock focus.", e);
         }
@@ -777,11 +777,13 @@ class Camera2 extends CameraViewImpl {
             extends CameraCaptureSession.CaptureCallback {
 
         static final int STATE_PREVIEW = 0;
-        static final int STATE_LOCKING = 1;
-        static final int STATE_LOCKED = 2;
-        static final int STATE_PRECAPTURE = 3;
-        static final int STATE_WAITING = 4;
-        static final int STATE_CAPTURING = 5;
+        static final int STATE_FOCUSING = 1;
+        static final int STATE_FOCUS_REQUEST = 2;
+        static final int STATE_LOCKING = 3;
+        static final int STATE_LOCKED = 4;
+        static final int STATE_PRECAPTURE = 5;
+        static final int STATE_WAITING = 6;
+        static final int STATE_CAPTURING = 7;
 
         private int mState;
 
@@ -806,6 +808,26 @@ class Camera2 extends CameraViewImpl {
 
         private void process(@NonNull CaptureResult result) {
             switch (mState) {
+
+                case STATE_PREVIEW: {
+                    break;
+                }
+                case STATE_FOCUS_REQUEST: {
+                    Integer am = result.get(CaptureResult.CONTROL_AF_MODE);
+                    if( am != null && (am == CaptureResult.CONTROL_AF_MODE_AUTO || am == CaptureResult.CONTROL_AF_MODE_MACRO))
+                        onFocusRequested();
+                    break;
+                }
+                case STATE_FOCUSING: {
+                    Integer af = result.get(CaptureResult.CONTROL_AF_STATE);
+                    if (af == null)
+                        break;
+
+                    if(af == CaptureResult.CONTROL_AF_STATE_FOCUSED_LOCKED || af == CaptureResult.CONTROL_AF_STATE_NOT_FOCUSED_LOCKED)
+                        setState(STATE_LOCKING);
+
+                    break;
+                }
                 case STATE_LOCKING: {
                     Integer af = result.get(CaptureResult.CONTROL_AF_STATE);
                     if (af == null) {
@@ -843,6 +865,11 @@ class Camera2 extends CameraViewImpl {
                 }
             }
         }
+
+        /**
+         * Called when it is necessary to focus before capture.
+         */
+        protected abstract void onFocusRequested();
 
         /**
          * Called when it is ready to take a still picture.
