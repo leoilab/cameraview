@@ -443,6 +443,8 @@ class Camera1 extends CameraViewImpl {
             final List<String> modes = mCameraParameters.getSupportedFocusModes();
             if (autoFocus && modes.contains(Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE)) {
                 mCameraParameters.setFocusMode(Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE);
+            } else if (autoFocus && modes.contains(Camera.Parameters.FOCUS_MODE_AUTO)) {
+                mCameraParameters.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO);
             } else if (modes.contains(Camera.Parameters.FOCUS_MODE_FIXED)) {
                 mCameraParameters.setFocusMode(Camera.Parameters.FOCUS_MODE_FIXED);
             } else if (modes.contains(Camera.Parameters.FOCUS_MODE_INFINITY)) {
