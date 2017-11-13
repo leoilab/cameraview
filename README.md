@@ -54,6 +54,19 @@ Requires API Level 9. The library uses Camera 1 API on API Level 9-20 and Camera
 
 You can see a complete usage in the demo app.
 
-## Contribution
+## Deployment
 
-See [CONTRIBUTING.md](/CONTRIBUTING.md).
+Before you can deploy to our Maven repository, you first need to add a `private.properties` file at the root of the project. This file should contain values for `myget.username` and `myget.token` where you enter your MyGet username and generated token (not your password). For example:
+
+```
+myget.username = username
+myget.token = aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee
+```
+
+To deploy the package, assemble and upload the generated archives to our Maven repository.
+
+```
+./gradlew :library:assemble :library:uploadArchives
+```
+
+If you have made changes and are deploying a new version, be sure to update the version number in the library's `build.gradle` file first.

@@ -13,6 +13,7 @@
 // limitations under the License.
 
 apply plugin: 'com.android.library'
+apply plugin: 'maven'
 
 android {
     compileSdkVersion rootProject.ext.compileSdkVersion
@@ -49,5 +50,46 @@ dependencies {
     }
     androidTestCompile('com.android.support.test.espresso:espresso-core:2.2.2') {
         exclude module: 'support-annotations'
+    }
+}
+
+uploadArchives {
+    def privatePropertiesFile = rootProject.file("private.properties")
+    def privateProperties = new Properties()
+
+    if (privatePropertiesFile.exists()) {
+        privateProperties.load(new FileInputStream(privatePropertiesFile))
+    }
+
+    def mavenUsername = privateProperties['myget.username']
+    def mavenToken = privateProperties['myget.token']
+
+    if (project.hasProperty('myget.username') && project.hasProperty('myget.token')) {
+        mavenUsername = project.getProperty('myget.username')
+        mavenToken = project.getProperty('myget.token')
+    }
+
+    repositories {
+        mavenDeployer {
+            repository(url: "https://www.myget.org/F/leoilab/maven") {
+                authentication(userName: mavenUsername, password: mavenToken)
+            }
+            pom.project {
+                name 'CameraView'
+                groupId 'com.leo_pharma'
+                artifactId 'cameraview'
+                version '1.0'
+                packaging 'aar'
+                description 'The LEO iLab fork of CameraView.'
+                url 'https://github.com/leoilab/cameraview'
+                licenses {
+                    license {
+                        name 'The Apache Software License, Version 2.0'
+                        url 'https://github.com/leoilab/cameraview/blob/master/LICENSE'
+                        distribution 'repo'
+                    }
+                }
+            }
+        }
     }
 }
