@@ -8,3 +8,5 @@
 .idea/
 !.idea/copyright/*.xml
 !.idea/codeStyleSettings.xml
+
+private.properties
