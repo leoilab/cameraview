@@ -71,7 +71,7 @@ uploadArchives {
 
     repositories {
         mavenDeployer {
-            repository(url: "https://www.myget.org/F/leoilab/maven") {
+            repository(url: "https://www.myget.org/F/imagine/maven") {
                 authentication(userName: mavenUsername, password: mavenToken)
             }
             pom.project {
