@@ -237,6 +237,7 @@ public class MainActivity extends AppCompatActivity implements
         @Override
         public void onCameraOpened(CameraView cameraView) {
             Log.d(TAG, "onCameraOpened");
+            cameraView.setAutoFocus(true);
         }
 
         @Override
