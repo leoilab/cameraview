@@ -109,6 +109,7 @@ public class MainActivity extends AppCompatActivity implements
         mCameraView = (CameraView) findViewById(R.id.camera);
         if (mCameraView != null) {
             mCameraView.addCallback(mCallback);
+            mCameraView.setAutoFocus(true);
         }
         FloatingActionButton takePicture = (FloatingActionButton) findViewById(R.id.take_picture);
         if (takePicture != null) {
@@ -237,7 +238,6 @@ public class MainActivity extends AppCompatActivity implements
         @Override
         public void onCameraOpened(CameraView cameraView) {
             Log.d(TAG, "onCameraOpened");
-            cameraView.setAutoFocus(true);
         }
 
         @Override
