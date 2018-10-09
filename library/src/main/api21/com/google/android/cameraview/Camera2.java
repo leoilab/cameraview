@@ -107,6 +107,14 @@ class Camera2 extends CameraViewImpl {
             } catch (IllegalStateException e) {
                 Log.e(TAG, "Failed to start camera preview.", e);
             }
+            // If we have a pending capture requests process it.
+            if (mTakePictureOnReadyCaptureSession) {
+                mTakePictureOnReadyCaptureSession = false;
+                if (System.currentTimeMillis() - mTakePictureOnReadyTimestamp <=
+                        TAKE_PICTURE_TIME_OUT_MS) {
+                    takePicture();
+                }
+            }
         }
 
         @Override
@@ -209,6 +217,15 @@ class Camera2 extends CameraViewImpl {
     private Point mAutoFocusPoint;
 
     private Point mAutoExposurePoint;
+
+    // Pending capture request while restarting CaptureSession or CameraDevice
+    private boolean mTakePictureOnReadyCaptureSession;
+
+    // Timestamp/timeout for pending capture request
+    private long mTakePictureOnReadyTimestamp;
+
+    // Sanity timeout for pending capture requests
+    final static long TAKE_PICTURE_TIME_OUT_MS = 2000;
 
     Camera2(Callback callback, PreviewImpl preview, Context context) {
         super(callback, preview);
@@ -347,10 +364,16 @@ class Camera2 extends CameraViewImpl {
 
     @Override
     void takePicture() {
-        if (mAutoFocus) {
-            lockFocus();
-        } else {
-            captureStillPicture();
+        if(mCaptureSession != null) {
+            if (mAutoFocus) {
+                lockFocus();
+            } else {
+                captureStillPicture();
+            }
+        }
+        else {
+            mTakePictureOnReadyCaptureSession = true;
+            mTakePictureOnReadyTimestamp = System.currentTimeMillis();
         }
     }
 
