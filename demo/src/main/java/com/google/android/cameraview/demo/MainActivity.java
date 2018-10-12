@@ -89,18 +89,7 @@ public class MainActivity extends AppCompatActivity implements
 
     private Handler mBackgroundHandler;
 
-    private View.OnClickListener mOnClickListener = new View.OnClickListener() {
-        @Override
-        public void onClick(View v) {
-            switch (v.getId()) {
-                case R.id.take_picture:
-                    if (mCameraView != null) {
-                        mCameraView.takePicture();
-                    }
-                    break;
-            }
-        }
-    };
+    private FloatingActionButton mTakePictureButton;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -111,9 +100,17 @@ public class MainActivity extends AppCompatActivity implements
             mCameraView.addCallback(mCallback);
             mCameraView.setAutoFocus(true);
         }
-        FloatingActionButton takePicture = (FloatingActionButton) findViewById(R.id.take_picture);
-        if (takePicture != null) {
-            takePicture.setOnClickListener(mOnClickListener);
+        mTakePictureButton = (FloatingActionButton) findViewById(R.id.take_picture);
+        if (mTakePictureButton != null) {
+            mTakePictureButton.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (mCameraView != null) {
+                        mTakePictureButton.setVisibility(View.INVISIBLE);
+                        mCameraView.takePicture();
+                    }
+                }
+            });
         }
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
@@ -126,6 +123,7 @@ public class MainActivity extends AppCompatActivity implements
     @Override
     protected void onResume() {
         super.onResume();
+        mTakePictureButton.setVisibility(View.VISIBLE);
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
                 == PackageManager.PERMISSION_GRANTED) {
             mCameraView.start();
@@ -248,6 +246,7 @@ public class MainActivity extends AppCompatActivity implements
         @Override
         public void onPictureTaken(CameraView cameraView, final byte[] data) {
             Log.d(TAG, "onPictureTaken " + data.length);
+            mTakePictureButton.setVisibility(View.VISIBLE);
             Toast.makeText(cameraView.getContext(), R.string.picture_taken, Toast.LENGTH_SHORT)
                     .show();
             getBackgroundHandler().post(new Runnable() {
@@ -275,6 +274,12 @@ public class MainActivity extends AppCompatActivity implements
             });
         }
 
+        @Override
+        public void onCaptureFailed(CameraView cameraView, String message) {
+            Toast.makeText(cameraView.getContext(), message, Toast.LENGTH_LONG)
+                    .show();
+            mTakePictureButton.setVisibility(View.VISIBLE);
+        }
     };
 
     public static class ConfirmationDialogFragment extends DialogFragment {

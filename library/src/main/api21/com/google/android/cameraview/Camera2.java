@@ -110,9 +110,13 @@ class Camera2 extends CameraViewImpl {
             // If we have a pending capture requests process it.
             if (mTakePictureOnReadyCaptureSession) {
                 mTakePictureOnReadyCaptureSession = false;
-                if (System.currentTimeMillis() - mTakePictureOnReadyTimestamp <=
-                        TAKE_PICTURE_TIME_OUT_MS) {
+                long currentTime = System.currentTimeMillis();
+                if (currentTime - mTakePictureOnReadyTimestamp <= TAKE_PICTURE_TIME_OUT_MS) {
                     takePicture();
+                }
+                else {
+                    mCallback.onCaptureFailed("Capture request did timeout after: " +
+                            (currentTime - mTakePictureOnReadyTimestamp) + " ms");
                 }
             }
         }
