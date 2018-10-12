@@ -491,6 +491,13 @@ public class CameraView extends FrameLayout {
             }
         }
 
+        @Override
+        public void onCaptureFailed(String message) {
+            for (Callback callback : mCallbacks) {
+                callback.onCaptureFailed(CameraView.this, message);
+            }
+        }
+
         public void reserveRequestLayoutOnOpen() {
             mRequestLayoutOnOpen = true;
         }
@@ -584,6 +591,15 @@ public class CameraView extends FrameLayout {
          * @param data       JPEG data.
          */
         public void onPictureTaken(CameraView cameraView, byte[] data) {
+        }
+
+        /**
+         * Called when a picture capture has failed.
+         *
+         * @param cameraView The associated {@link CameraView}.
+         * @param message    A string describing the reason for failing.
+         */
+        public void onCaptureFailed(CameraView cameraView, String message) {
         }
     }
 
