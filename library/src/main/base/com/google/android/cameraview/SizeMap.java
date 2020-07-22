@@ -16,11 +16,13 @@
 
 package com.google.android.cameraview;
 
-import android.support.v4.util.ArrayMap;
+
 
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
+
+import androidx.collection.ArrayMap;
 
 /**
  * A collection class that automatically groups {@link Size}s by their {@link AspectRatio}s.

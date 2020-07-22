@@ -25,16 +25,18 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
-import android.support.annotation.NonNull;
-import android.support.annotation.StringRes;
-import android.support.design.widget.FloatingActionButton;
-import android.support.v4.app.ActivityCompat;
-import android.support.v4.app.DialogFragment;
-import android.support.v4.content.ContextCompat;
-import android.support.v7.app.ActionBar;
-import android.support.v7.app.AlertDialog;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.Toolbar;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.StringRes;
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
+import androidx.core.app.ActivityCompat;
+
+import androidx.core.content.ContextCompat;
+import androidx.fragment.app.DialogFragment;
+
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -43,6 +45,7 @@ import android.widget.Toast;
 
 import com.google.android.cameraview.AspectRatio;
 import com.google.android.cameraview.CameraView;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -106,7 +109,7 @@ public class MainActivity extends AppCompatActivity implements
                 @Override
                 public void onClick(View v) {
                     if (mCameraView != null) {
-                        mTakePictureButton.setVisibility(View.INVISIBLE);
+                        mTakePictureButton.hide();
                         mCameraView.takePicture();
                     }
                 }
@@ -123,7 +126,7 @@ public class MainActivity extends AppCompatActivity implements
     @Override
     protected void onResume() {
         super.onResume();
-        mTakePictureButton.setVisibility(View.VISIBLE);
+        mTakePictureButton.show();
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
                 == PackageManager.PERMISSION_GRANTED) {
             mCameraView.start();
@@ -246,7 +249,7 @@ public class MainActivity extends AppCompatActivity implements
         @Override
         public void onPictureTaken(CameraView cameraView, final byte[] data) {
             Log.d(TAG, "onPictureTaken " + data.length);
-            mTakePictureButton.setVisibility(View.VISIBLE);
+            mTakePictureButton.show();
             Toast.makeText(cameraView.getContext(), R.string.picture_taken, Toast.LENGTH_SHORT)
                     .show();
             getBackgroundHandler().post(new Runnable() {
@@ -278,7 +281,7 @@ public class MainActivity extends AppCompatActivity implements
         public void onCaptureFailed(CameraView cameraView, String message) {
             Toast.makeText(cameraView.getContext(), message, Toast.LENGTH_LONG)
                     .show();
-            mTakePictureButton.setVisibility(View.VISIBLE);
+            mTakePictureButton.show();
         }
     };
 

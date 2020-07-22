@@ -17,15 +17,15 @@
 package com.google.android.cameraview;
 
 import android.os.Build;
-import android.support.annotation.NonNull;
-import android.support.v4.hardware.display.DisplayManagerCompat;
-import android.support.v4.view.ViewCompat;
+import androidx.annotation.NonNull;
+import androidx.core.hardware.display.DisplayManagerCompat;
+import androidx.core.view.ViewCompat;
 import android.view.Display;
 import android.view.View;
 
 
 /**
- * Some more addition to {@link android.support.v4.view.ViewCompat}.
+ * Some more addition to {@link androidx.core.view.ViewCompat}.
  */
 class ViewCompat2 {
 
